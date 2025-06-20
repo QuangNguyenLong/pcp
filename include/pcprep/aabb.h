@@ -16,11 +16,12 @@ extern "C"
    * Defined by its min and max corners.
    * @see aabb.h
    */
-  typedef struct aabb_t
+  typedef struct pcp_aabb_t pcp_aabb_t;
+  struct pcp_aabb_t
   {
-    vec3f_t min; ///< Minimum (x, y, z)
-    vec3f_t max; ///< Maximum (x, y, z)
-  } aabb_t;
+    pcp_vec3f_t min; ///< Minimum (x, y, z)
+    pcp_vec3f_t max; ///< Maximum (x, y, z)
+  };
 
   /**
    * @brief Constructs a triangle mesh from an axis-aligned bounding
@@ -33,7 +34,7 @@ extern "C"
    * @return 0 on success, non-zero on failure.
    */
   PCPREP_EXPORT
-  int aabb_to_mesh(aabb_t aabb, mesh_t *mesh);
+  int pcp_aabb_to_mesh(pcp_aabb_t aabb, pcp_mesh_t *mesh);
 
 #ifdef __cplusplus
 }

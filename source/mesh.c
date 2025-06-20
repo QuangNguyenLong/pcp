@@ -1,12 +1,14 @@
-#include <pcprep/core.h>
 #include <pcprep/mesh.h>
+#include <pcprep/utils.h>
 #include <pcprep/vec3f.h>
 #include <pcprep/wrapper.h>
 #define MSH_PLY_INCLUDE_LIBC_HEADERS
 #define MSH_PLY_IMPLEMENTATION
 #include <msh_ply.h>
 
-int mesh_init(mesh_t *mesh, uint32_t num_verts, uint32_t num_indices)
+int pcp_mesh_alloc(pcp_mesh_t *mesh,
+                   uint32_t    num_verts,
+                   uint32_t    num_indices)
 {
   if (num_verts < 0 || num_indices < 0)
     return -1;
@@ -17,7 +19,7 @@ int mesh_init(mesh_t *mesh, uint32_t num_verts, uint32_t num_indices)
   mesh->num_indices = num_indices;
   return 1;
 }
-int mesh_free(mesh_t *mesh)
+int pcp_mesh_free(pcp_mesh_t *mesh)
 {
   if (mesh == NULL)
     return 1;
@@ -33,13 +35,13 @@ int mesh_free(mesh_t *mesh)
   }
   return 1;
 }
-int mesh_load(mesh_t *mesh, const char *filename)
+int pcp_mesh_load(pcp_mesh_t *mesh, const char *filename)
 {
-  mesh_init(
+  pcp_mesh_alloc(
       mesh, ply_count_vertex(filename), ply_count_face(filename) * 3);
   return ply_mesh_loader(filename, mesh->pos, mesh->indices);
 }
-int mesh_write(mesh_t mesh, const char *filename, int binary)
+int pcp_mesh_write(pcp_mesh_t mesh, const char *filename, int binary)
 {
   msh_ply_desc_t descriptors[2];
   descriptors[0] = (msh_ply_desc_t){
@@ -78,15 +80,18 @@ static int is_toward(vec2f_t a, vec2f_t b, vec2f_t c)
   return (b.x - a.x) * (c.y - a.y) > (c.x - a.x) * (b.y - a.y);
 }
 
-int mesh_screen_ratio(mesh_t mesh, float *mvp, float *screen_ratio)
+int pcp_mesh_get_screen_ratio(pcp_mesh_t mesh,
+                              float     *mvp,
+                              float     *screen_ratio)
 {
-  *screen_ratio     = 0;
+  *screen_ratio         = 0;
 
-  vec3f_t *vertices = (vec3f_t *)mesh.pos;
-  vec3f_t *ndcs = (vec3f_t *)malloc(sizeof(vec3f_t) * mesh.num_verts);
+  pcp_vec3f_t *vertices = (pcp_vec3f_t *)mesh.pos;
+  pcp_vec3f_t *ndcs =
+      (pcp_vec3f_t *)malloc(sizeof(pcp_vec3f_t) * mesh.num_verts);
   for (int i = 0; i < mesh.num_verts; i++)
   {
-    ndcs[i] = vec3f_mvp_mul(vertices[i], mvp);
+    ndcs[i] = pcp_vec3f_mvp_mul(vertices[i], mvp);
   }
 
   for (int i = 0; i < mesh.num_indices / 3; i++)

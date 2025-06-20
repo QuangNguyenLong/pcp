@@ -1,7 +1,7 @@
 #define _POSIX_C_SOURCE 199309L
 #include <cJSON.h>
 #include <math.h>
-#include <pcprep/core.h>
+#include <pcprep/utils.h>
 #include <stdio.h>
 #include <string.h>
 #include <time.h>

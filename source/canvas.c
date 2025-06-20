@@ -5,8 +5,8 @@
 #include <stdlib.h>
 #include <string.h>
 #ifdef HAVE_GPU
-#include <GL/glew.h>
 #include <GL/gl.h>
+#include <GL/glew.h>
 #include <GLFW/glfw3.h>
 
 static const char *default_vert_shader =
@@ -114,7 +114,7 @@ GLuint             load_shader(char *vertex_shader_code,
   return ProgramID;
 }
 
-static int canvas_init_gl(canvas_t *cv)
+static int pcp_canvas_start_gl(pcp_canvas_t *cv)
 {
   GLFWwindow *window   = NULL;
 
@@ -213,7 +213,7 @@ static int canvas_init_gl(canvas_t *cv)
   return 0;
 }
 
-int canvas_free_gl(canvas_t *cv)
+int canvas_free_gl(pcp_canvas_t *cv)
 {
   glDeleteFramebuffers(1, &cv->frame_buffer);
   glDeleteTextures(1, &cv->rendered_texture);
@@ -232,14 +232,14 @@ int canvas_free_gl(canvas_t *cv)
 
 #endif
 
-int canvas_init(canvas_t *cv,
-                size_t    width,
-                size_t    height,
+int pcp_canvas_init(pcp_canvas_t *cv,
+                    size_t        width,
+                    size_t        height,
 #ifdef HAVE_GPU
-                char *vert_shader,
-                char *frag_shader,
+                    char *vert_shader,
+                    char *frag_shader,
 #endif
-                vec3uc_t bg_col)
+                    pcp_vec3uc_t bg_col)
 {
   cv->width       = width;
   cv->height      = height;
@@ -254,18 +254,18 @@ int canvas_init(canvas_t *cv,
 #ifdef HAVE_GPU
   cv->vert_shader = vert_shader;
   cv->frag_shader = frag_shader;
-  canvas_init_gl(cv);
-  cv->draw_points = canvas_draw_points_gpu;
+  pcp_canvas_start_gl(cv);
+  cv->draw_points = pcp_canvas_draw_points_gpu;
 #else
-  cv->draw_points = canvas_draw_points_cpu;
+  cv->draw_points = pcp_canvas_draw_points_cpu;
 #endif
 
-  cv->clear = canvas_clear;
+  cv->clear = pcp_canvas_clear;
 }
 
-int canvas_free(canvas_t *cv)
+int canvas_free(pcp_canvas_t *cv)
 {
-  cv->bg_col = (vec3uc_t){0};
+  cv->bg_col = (pcp_vec3uc_t){0};
   if (cv->pixels)
   {
     free(cv->pixels);
@@ -294,11 +294,11 @@ int canvas_free(canvas_t *cv)
 #endif
 }
 #ifdef HAVE_GPU
-void canvas_draw_points_gpu(canvas_t      *cv,
-                            float         *mvp,
-                            float         *pos,
-                            unsigned char *rgb,
-                            size_t         count)
+void pcp_canvas_draw_points_gpu(pcp_canvas_t  *cv,
+                                float         *mvp,
+                                float         *pos,
+                                unsigned char *rgb,
+                                size_t         count)
 {
   unsigned int vbuffer = 0;
   unsigned int rbuffer = 0;
@@ -351,19 +351,19 @@ void canvas_draw_points_gpu(canvas_t      *cv,
 }
 #endif
 
-void canvas_draw_points_cpu(canvas_t      *cv,
-                            float         *mvp,
-                            float         *pos,
-                            unsigned char *rgb,
-                            size_t         count)
+void pcp_canvas_draw_points_cpu(pcp_canvas_t  *cv,
+                                float         *mvp,
+                                float         *pos,
+                                unsigned char *rgb,
+                                size_t         count)
 {
-  vec3f_t  *positions  = NULL;
-  vec3uc_t *colors     = NULL;
-  vec3uc_t *rgb_pixels = NULL;
-  size_t    screen_w   = 0;
-  size_t    screen_h   = 0;
+  pcp_vec3f_t  *positions  = NULL;
+  pcp_vec3uc_t *colors     = NULL;
+  pcp_vec3uc_t *rgb_pixels = NULL;
+  size_t        screen_w   = 0;
+  size_t        screen_h   = 0;
 
-  rgb_pixels           = (vec3uc_t *)cv->pixels;
+  rgb_pixels               = (pcp_vec3uc_t *)cv->pixels;
 
   for (int i = 0; i < cv->height; i++)
   {
@@ -374,12 +374,12 @@ void canvas_draw_points_cpu(canvas_t      *cv,
     }
   }
 
-  positions = (vec3f_t *)pos;
-  colors    = (vec3uc_t *)rgb;
+  positions = (pcp_vec3f_t *)pos;
+  colors    = (pcp_vec3uc_t *)rgb;
 
   for (int i = 0; i < count; i++)
   {
-    vec3f_t ndc = vec3f_mvp_mul(positions[i], mvp);
+    pcp_vec3f_t ndc = pcp_vec3f_mvp_mul(positions[i], mvp);
     if (ndc.x >= -1 && ndc.x <= 1 && ndc.y >= -1 && ndc.y <= 1 &&
         ndc.z >= 0 && ndc.z <= 1)
     {
@@ -401,7 +401,7 @@ void canvas_draw_points_cpu(canvas_t      *cv,
   }
 }
 
-void canvas_clear(canvas_t *cv)
+void pcp_canvas_clear(pcp_canvas_t *cv)
 {
   memset(cv->pixels,
          0,
