@@ -1,23 +1,44 @@
 #include "pcprep/point_cloud.h"
 #include "pcprep/utils.h"
-#include "pcprep/vec3f.h"
 #include "pcprep/vec3uc.h"
 #include "pcprep/wrapper.h"
 #include <stdio.h>
 #include <string.h>
 #include <time.h>
 
-int pcp_point_cloud_init(pcp_point_cloud_t *pc, size_t size)
+pcp_ret_t pcp_point_cloud_init(pcp_point_cloud_t *self)
+{
+  *self                    = (pcp_point_cloud_t){0};
+  self->alloc              = pcp_point_cloud_alloc;
+  self->load               = pcp_point_cloud_load;
+  self->write              = pcp_point_cloud_write;
+  self->get_min            = pcp_point_cloud_get_min;
+  self->get_max            = pcp_point_cloud_get_max;
+  self->tile               = pcp_point_cloud_tile;
+  self->sample             = pcp_point_cloud_sample;
+  self->remove_dupplicates = pcp_point_cloud_remove_dupplicates;
+  self->voxelize           = pcp_point_cloud_voxelize;
+  self->get_pixel_per_tile = pcp_point_cloud_get_pixel_per_tile;
+  return PCPREP_RET_SUCCESS;
+}
+
+pcp_ret_t pcp_point_cloud_alloc(pcp_point_cloud_t *pc, size_t size)
 {
   pc->size = size;
   pc->pos  = (float *)malloc(sizeof(float) * 3 * pc->size);
   pc->rgb  = (uint8_t *)malloc(sizeof(uint8_t) * 3 * pc->size);
-  return pc->size;
+  if (pc->size < 0)
+  {
+    return PCPREP_RET_FAIL;
+  }
+  return PCPREP_RET_SUCCESS;
 }
-int pcp_point_cloud_free(pcp_point_cloud_t *pc)
+pcp_ret_t pcp_point_cloud_free(pcp_point_cloud_t *pc)
 {
   if (pc == NULL)
-    return 1;
+  {
+    return PCPREP_RET_FAIL;
+  }
   if (pc->pos)
   {
     free(pc->pos);
@@ -28,22 +49,27 @@ int pcp_point_cloud_free(pcp_point_cloud_t *pc)
     free(pc->rgb);
     pc->rgb = NULL;
   }
-  return 1;
+  return PCPREP_RET_SUCCESS;
 }
-int pcp_point_cloud_load(pcp_point_cloud_t *pc, const char *filename)
+pcp_ret_t pcp_point_cloud_load(pcp_point_cloud_t *pc,
+                               const char        *filename)
 {
-  pcp_point_cloud_init(pc, ply_count_vertex(filename));
-  return ply_pcp_point_cloud_loader(filename, pc->pos, pc->rgb);
+  pc->alloc(pc, ply_count_vertex(filename));
+  if (!ply_pcp_point_cloud_loader(filename, pc->pos, pc->rgb))
+  {
+    return PCPREP_RET_FAIL;
+  }
+  return PCPREP_RET_SUCCESS;
 }
-int pcp_point_cloud_write(pcp_point_cloud_t pc,
-                          const char       *filename,
-                          int               binary)
+pcp_ret_t pcp_point_cloud_write(pcp_point_cloud_t *pc,
+                                const char        *filename,
+                                int                binary)
 {
   FILE *file = fopen(filename, "wb");
   if (!file)
   {
     perror("Error opening file");
-    return -1;
+    return PCPREP_RET_FAIL;
   }
 
   if (binary)
@@ -51,7 +77,7 @@ int pcp_point_cloud_write(pcp_point_cloud_t pc,
     // Binary PLY Header
     fprintf(file, "ply\n");
     fprintf(file, "format binary_little_endian 1.0\n");
-    fprintf(file, "element vertex %zu\n", pc.size);
+    fprintf(file, "element vertex %zu\n", pc->size);
     fprintf(file, "property float x\n");
     fprintf(file, "property float y\n");
     fprintf(file, "property float z\n");
@@ -60,10 +86,10 @@ int pcp_point_cloud_write(pcp_point_cloud_t pc,
     fprintf(file, "property uchar blue\n");
     fprintf(file, "end_header\n");
 
-    for (size_t i = 0; i < pc.size; ++i)
+    for (size_t i = 0; i < pc->size; i++)
     {
-      fwrite(&pc.pos[i * 3], sizeof(float), 3, file);   // x, y, z
-      fwrite(&pc.rgb[i * 3], sizeof(uint8_t), 3, file); // r, g, b
+      fwrite(&pc->pos[i * 3], sizeof(float), 3, file);   // x, y, z
+      fwrite(&pc->rgb[i * 3], sizeof(uint8_t), 3, file); // r, g, b
     }
   }
   else
@@ -71,7 +97,7 @@ int pcp_point_cloud_write(pcp_point_cloud_t pc,
     // ASCII PLY Header
     fprintf(file, "ply\n");
     fprintf(file, "format ascii 1.0\n");
-    fprintf(file, "element vertex %zu\n", pc.size);
+    fprintf(file, "element vertex %zu\n", pc->size);
     fprintf(file, "property float x\n");
     fprintf(file, "property float y\n");
     fprintf(file, "property float z\n");
@@ -80,30 +106,33 @@ int pcp_point_cloud_write(pcp_point_cloud_t pc,
     fprintf(file, "property uchar blue\n");
     fprintf(file, "end_header\n");
 
-    for (size_t i = 0; i < pc.size; ++i)
+    for (size_t i = 0; i < pc->size; i++)
     {
       fprintf(file,
               "%f %f %f %u %u %u\n",
-              pc.pos[i * 3],
-              pc.pos[i * 3 + 1],
-              pc.pos[i * 3 + 2],
-              pc.rgb[i * 3],
-              pc.rgb[i * 3 + 1],
-              pc.rgb[i * 3 + 2]);
+              pc->pos[i * 3],
+              pc->pos[i * 3 + 1],
+              pc->pos[i * 3 + 2],
+              pc->rgb[i * 3],
+              pc->rgb[i * 3 + 1],
+              pc->rgb[i * 3 + 2]);
     }
   }
 
   fclose(file);
-  return 0;
+  return PCPREP_RET_SUCCESS;
 }
 
-int pcp_point_cloud_get_min(pcp_point_cloud_t pc, pcp_vec3f_t *min)
+pcp_ret_t pcp_point_cloud_get_min(pcp_point_cloud_t *pc,
+                                  pcp_vec3f_t       *min)
 {
-  if (!pc.pos)
-    return -1;
-  pcp_vec3f_t *pos_lst = (pcp_vec3f_t *)(pc.pos);
+  if (!pc->pos)
+  {
+    return PCPREP_RET_FAIL;
+  }
+  pcp_vec3f_t *pos_lst = (pcp_vec3f_t *)(pc->pos);
   *min                 = pos_lst[0];
-  for (int i = 0; i < pc.size; i++)
+  for (int i = 0; i < pc->size; i++)
   {
     if (pos_lst[i].x < min->x)
       min->x = pos_lst[i].x;
@@ -112,15 +141,18 @@ int pcp_point_cloud_get_min(pcp_point_cloud_t pc, pcp_vec3f_t *min)
     if (pos_lst[i].z < min->z)
       min->z = pos_lst[i].z;
   }
-  return 0;
+  return PCPREP_RET_SUCCESS;
 }
-int pcp_point_cloud_get_max(pcp_point_cloud_t pc, pcp_vec3f_t *max)
+pcp_ret_t pcp_point_cloud_get_max(pcp_point_cloud_t *pc,
+                                  pcp_vec3f_t       *max)
 {
-  if (!pc.pos)
-    return -1;
-  pcp_vec3f_t *pos_lst = (pcp_vec3f_t *)(pc.pos);
+  if (!pc->pos)
+  {
+    return PCPREP_RET_FAIL;
+  }
+  pcp_vec3f_t *pos_lst = (pcp_vec3f_t *)(pc->pos);
   *max                 = pos_lst[0];
-  for (int i = 0; i < pc.size; i++)
+  for (int i = 0; i < pc->size; i++)
   {
     if (pos_lst[i].x > max->x)
       max->x = pos_lst[i].x;
@@ -129,42 +161,19 @@ int pcp_point_cloud_get_max(pcp_point_cloud_t pc, pcp_vec3f_t *max)
     if (pos_lst[i].z > max->z)
       max->z = pos_lst[i].z;
   }
-  return 0;
-}
-
-int get_tile_id(pcp_vec3f_t n,
-                pcp_vec3f_t min,
-                pcp_vec3f_t max,
-                pcp_vec3f_t v)
-{
-  if (v.x > max.x || v.y > max.y || v.z > max.z || v.x < min.x ||
-      v.y < min.y || v.z < min.z)
-    return -1;
-  pcp_vec3f_t ans;
-  // ans = (v - min) / ((max - min) / n);
-  // or ans = (v - min) * (invs(max - min) / n);
-  // or ans = (v - min) * (invs(max - min) * invs(n));
-  // or ans = (v - min) * invs(max - min) * n);
-  ans = pcp_vec3f_mul(
-      pcp_vec3f_mul(pcp_vec3f_sub(v, min),
-                    pcp_vec3f_inverse(pcp_vec3f_sub(max, min))),
-      n);
-  ans = (pcp_vec3f_t){(int)(ans.x < n.x ? ans.x : n.x - 1),
-                      (int)(ans.y < n.y ? ans.y : n.y - 1),
-                      (int)(ans.z < n.z ? ans.z : n.z - 1)};
-
-  return ans.z + ans.y * n.z + ans.x * n.y * n.z;
+  return PCPREP_RET_SUCCESS;
 }
 
 // TODO: this function is not safe
-int pcp_point_cloud_tile(pcp_point_cloud_t   pc,
-                         int                 n_x,
-                         int                 n_y,
-                         int                 n_z,
-                         pcp_point_cloud_t **tiles)
+pcp_ret_t pcp_point_cloud_tile(pcp_point_cloud_t  *pc,
+                               int                 n_x,
+                               int                 n_y,
+                               int                 n_z,
+                               pcp_point_cloud_t **tiles)
 {
-  pcp_vec3f_t  min, max;
-  pcp_vec3f_t *pos_lst  = (pcp_vec3f_t *)pc.pos;
+  pcp_vec3f_t  min      = {0};
+  pcp_vec3f_t  max      = {0};
+  pcp_vec3f_t *pos_lst  = (pcp_vec3f_t *)pc->pos;
   pcp_vec3f_t  n        = (pcp_vec3f_t){n_x, n_y, n_z};
   int          size     = n.x * n.y * n.z;
 
@@ -172,23 +181,27 @@ int pcp_point_cloud_tile(pcp_point_cloud_t   pc,
   int         *tmp      = (int *)malloc(sizeof(int) * size);
   *tiles =
       (pcp_point_cloud_t *)malloc(sizeof(pcp_point_cloud_t) * size);
+  for (int i = 0; i < size; i++)
+  {
+    pcp_point_cloud_init(&(*tiles)[i]);
+  }
 
   if (!tiles)
   {
     free(numVerts);
     free(tmp);
-    return -1;
+    return PCPREP_RET_FAIL;
   }
 
-  pcp_point_cloud_get_min(pc, &min);
-  pcp_point_cloud_get_max(pc, &max);
+  pc->get_min(pc, &min);
+  pc->get_max(pc, &max);
 
   for (int t = 0; t < size; t++)
   {
     numVerts[t] = 0;
     tmp[t]      = 0;
   }
-  for (int i = 0; i < pc.size; i++)
+  for (int i = 0; i < pc->size; i++)
   {
     int t = get_tile_id(n, min, max, pos_lst[i]);
     numVerts[t]++;
@@ -196,79 +209,53 @@ int pcp_point_cloud_tile(pcp_point_cloud_t   pc,
 
   for (int t = 0; t < size; t++)
   {
-    pcp_point_cloud_init(&(*tiles)[t], numVerts[t]);
+    (*tiles)[t].alloc(&(*tiles)[t], numVerts[t]);
   }
 
-  for (int i = 0; i < pc.size; i++)
+  for (int i = 0; i < pc->size; i++)
   {
     int t = get_tile_id(n, min, max, pos_lst[i]);
-    (*tiles)[t].pos[3 * tmp[t]]     = pc.pos[3 * i];
-    (*tiles)[t].pos[3 * tmp[t] + 1] = pc.pos[3 * i + 1];
-    (*tiles)[t].pos[3 * tmp[t] + 2] = pc.pos[3 * i + 2];
-    (*tiles)[t].rgb[3 * tmp[t]]     = pc.rgb[3 * i];
-    (*tiles)[t].rgb[3 * tmp[t] + 1] = pc.rgb[3 * i + 1];
-    (*tiles)[t].rgb[3 * tmp[t] + 2] = pc.rgb[3 * i + 2];
+    (*tiles)[t].pos[3 * tmp[t]]     = pc->pos[3 * i];
+    (*tiles)[t].pos[3 * tmp[t] + 1] = pc->pos[3 * i + 1];
+    (*tiles)[t].pos[3 * tmp[t] + 2] = pc->pos[3 * i + 2];
+    (*tiles)[t].rgb[3 * tmp[t]]     = pc->rgb[3 * i];
+    (*tiles)[t].rgb[3 * tmp[t] + 1] = pc->rgb[3 * i + 1];
+    (*tiles)[t].rgb[3 * tmp[t] + 2] = pc->rgb[3 * i + 2];
     tmp[t]++;
   }
 
   free(numVerts);
   free(tmp);
 
-  return size;
+  return PCPREP_RET_SUCCESS;
 }
 
-int point_cloud_merge(pcp_point_cloud_t *pcs,
-                      size_t             pc_count,
-                      pcp_point_cloud_t *out)
+pcp_ret_t pcp_point_cloud_sample(pcp_point_cloud_t *pc,
+                                 float              ratio,
+                                 unsigned char      strategy,
+                                 pcp_point_cloud_t *out)
 {
-  size_t total_size = 0;
-  for (int i = 0; i < pc_count; i++)
-    total_size += pcs[i].size;
-  if (pcp_point_cloud_init(out, total_size) < 0)
-  {
-    return -1; // Memory allocation failed
-  }
+  size_t num_points = (size_t)(pc->size * ratio);
 
-  int curr = 0;
-  for (int i = 0; i < pc_count; i++)
-  {
-    memcpy((char *)(out->pos + curr * 3),
-           (char *)pcs[i].pos,
-           pcs[i].size * 3 * sizeof(float));
-    memcpy((char *)(out->rgb + curr * 3),
-           (char *)pcs[i].rgb,
-           pcs[i].size * 3 * sizeof(uint8_t));
-    curr += pcs[i].size;
-  }
-  return 1;
-}
-
-int pcp_point_cloud_sample(pcp_point_cloud_t  pc,
-                           float              ratio,
-                           unsigned char      strategy,
-                           pcp_point_cloud_t *out)
-{
-  size_t num_points = (size_t)(pc.size * ratio);
-
-  pcp_point_cloud_init(out, num_points);
+  out->alloc(out, num_points);
 
   switch (strategy)
   {
   case PCP_SAMPLE_RULE_UNIFORM:
   {
-    int *index_arr = (int *)malloc(sizeof(int) * pc.size);
+    int *index_arr = (int *)malloc(sizeof(int) * pc->size);
     int *sample    = (int *)malloc(num_points * sizeof(int));
     // Seed the random number generator
     srand((unsigned int)time(NULL));
-    for (int i = 0; i < pc.size; i++)
+    for (int i = 0; i < pc->size; i++)
       index_arr[i] = i;
-    sample_union(index_arr, pc.size, sample, num_points);
+    sample_union(index_arr, pc->size, sample, num_points);
     for (int i = 0; i < num_points; i++)
     {
       for (int j = 0; j < 3; j++)
       {
-        out->pos[i * 3 + j] = pc.pos[sample[i] * 3 + j];
-        out->rgb[i * 3 + j] = pc.rgb[sample[i] * 3 + j];
+        out->pos[i * 3 + j] = pc->pos[sample[i] * 3 + j];
+        out->rgb[i * 3 + j] = pc->rgb[sample[i] * 3 + j];
       }
     }
     free(index_arr);
@@ -279,7 +266,7 @@ int pcp_point_cloud_sample(pcp_point_cloud_t  pc,
     break;
   }
 
-  return 1;
+  return PCPREP_RET_SUCCESS;
 }
 
 static void point_cloud_element_merge(pcp_point_cloud_t pc,
@@ -357,34 +344,34 @@ static void point_cloud_element_merge_sort(pcp_point_cloud_t pc,
   point_cloud_element_merge(pc, left, mid, right);
 }
 
-int pcp_point_cloud_remove_dupplicates(pcp_point_cloud_t  pc,
-                                       pcp_point_cloud_t *out)
+pcp_ret_t pcp_point_cloud_remove_dupplicates(pcp_point_cloud_t *pc,
+                                             pcp_point_cloud_t *out)
 {
   // use mergesort to sort points, then remove consecutives,
   // O(Nlog(N))
-  point_cloud_element_merge_sort(pc, 0, pc.size - 1);
+  point_cloud_element_merge_sort(*pc, 0, pc->size - 1);
 
   // count unique points to get output size
   size_t count_unique = 1;
-  for (int i = 1; i < pc.size; i++)
+  for (int i = 1; i < pc->size; i++)
   {
-    pcp_vec3f_t pre  = ((pcp_vec3f_t *)pc.pos)[i - 1];
-    pcp_vec3f_t curr = ((pcp_vec3f_t *)pc.pos)[i];
+    pcp_vec3f_t pre  = ((pcp_vec3f_t *)pc->pos)[i - 1];
+    pcp_vec3f_t curr = ((pcp_vec3f_t *)pc->pos)[i];
     if (!pcp_vec3f_eq(pre, curr))
     {
       count_unique++;
     }
   }
-  pcp_point_cloud_init(out, count_unique);
+  out->alloc(out, count_unique);
 
   // puts the unique points into the output, O(N)
   pcp_vec3f_t  *uni_pos = (pcp_vec3f_t *)(out->pos);
   pcp_vec3uc_t *uni_col = (pcp_vec3uc_t *)(out->rgb);
-  pcp_vec3f_t  *pos     = (pcp_vec3f_t *)(pc.pos);
-  pcp_vec3uc_t *col     = (pcp_vec3uc_t *)(pc.rgb);
+  pcp_vec3f_t  *pos     = (pcp_vec3f_t *)(pc->pos);
+  pcp_vec3uc_t *col     = (pcp_vec3uc_t *)(pc->rgb);
 
   int           index   = 0;
-  for (int i = 1; i < pc.size; i++)
+  for (int i = 1; i < pc->size; i++)
   {
     if (!pcp_vec3f_eq(pos[i], pos[i - 1]))
     {
@@ -393,41 +380,42 @@ int pcp_point_cloud_remove_dupplicates(pcp_point_cloud_t  pc,
     }
   }
 
-  return out->size;
+  return PCPREP_RET_SUCCESS;
 }
 
-int pcp_point_cloud_voxelize(pcp_point_cloud_t  pc,
-                             float              voxel_size,
-                             pcp_point_cloud_t *out)
+pcp_ret_t pcp_point_cloud_voxelize(pcp_point_cloud_t *pc,
+                                   float              voxel_size,
+                                   pcp_point_cloud_t *out)
 {
   // quantize the points to the voxel grid
   // then remove the duplicates, should it tho ?
 
-  pcp_point_cloud_init(out, pc.size);
+  out->alloc(out, pc->size);
 
-  memcpy(out->pos, pc.pos, pc.size * sizeof(float) * 3);
-  memcpy(out->rgb, pc.rgb, pc.size * sizeof(uint8_t) * 3);
+  memcpy(out->pos, pc->pos, pc->size * sizeof(float) * 3);
+  memcpy(out->rgb, pc->rgb, pc->size * sizeof(uint8_t) * 3);
 
   pcp_vec3f_t *pos = (pcp_vec3f_t *)out->pos;
   for (int i = 0; i < out->size; i++)
     pos[i] = pcp_vec3f_quantize(pos[i], voxel_size);
 
   // pcp_point_cloud_remove_dupplicates(pc, out);
+  return PCPREP_RET_SUCCESS;
 }
 
-int pcp_point_cloud_get_pixel_per_tile(pcp_point_cloud_t pc,
-                                       int               nx,
-                                       int               ny,
-                                       int               nz,
-                                       int               width,
-                                       int               height,
-                                       float            *mvp,
-                                       int              *pixel_count)
+pcp_ret_t pcp_point_cloud_get_pixel_per_tile(pcp_point_cloud_t *pc,
+                                             int                nx,
+                                             int                ny,
+                                             int                nz,
+                                             int                width,
+                                             int    height,
+                                             float *mvp,
+                                             int   *pixel_count)
 {
   for (int i = 0; i < nx * ny * nz; i++)
     pixel_count[i] = 0;
 
-  pcp_vec3f_t *points    = (pcp_vec3f_t *)pc.pos;
+  pcp_vec3f_t *points    = (pcp_vec3f_t *)pc->pos;
   pcp_vec3f_t  ndc       = {0, 0, 0};
   int          screen_w  = 0;
   int          screen_h  = 0;
@@ -435,8 +423,8 @@ int pcp_point_cloud_get_pixel_per_tile(pcp_point_cloud_t pc,
   float      **minZvalue = NULL;
   int16_t    **curr_tile = NULL;
   pcp_vec3f_t  min, max;
-  pcp_point_cloud_get_min(pc, &min);
-  pcp_point_cloud_get_max(pc, &max);
+  pc->get_min(pc, &min);
+  pc->get_max(pc, &max);
 
   minZvalue = (float **)malloc(sizeof(float *) * height);
   for (int i = 0; i < height; i++)
@@ -455,7 +443,7 @@ int pcp_point_cloud_get_pixel_per_tile(pcp_point_cloud_t pc,
       curr_tile[i][j] = -1;
   }
 
-  for (int i = 0; i < pc.size; i++)
+  for (int i = 0; i < pc->size; i++)
   {
     tile_id = (int)get_tile_id(
         (pcp_vec3f_t){nx, ny, nz}, min, max, points[i]);
@@ -503,5 +491,5 @@ int pcp_point_cloud_get_pixel_per_tile(pcp_point_cloud_t pc,
   for (int i = 0; i < height; i++)
     free(curr_tile[i]);
   free(curr_tile);
-  return 1;
+  return PCPREP_RET_SUCCESS;
 }

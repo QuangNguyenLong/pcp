@@ -35,11 +35,11 @@ GLuint             load_shader(char *vertex_shader_code,
   GLuint VertexShaderID   = glCreateShader(GL_VERTEX_SHADER);
   GLuint FragmentShaderID = glCreateShader(GL_FRAGMENT_SHADER);
 
-  if (vertex_shader_code == NULL)
+  if (vertex_shader_code == PCPREP_NULL)
   {
     vertex_shader_code = (char *)default_vert_shader;
   }
-  if (fragment_shader_code == NULL)
+  if (fragment_shader_code == PCPREP_NULL)
   {
     fragment_shader_code = (char *)default_frag_shader;
   }
@@ -49,7 +49,8 @@ GLuint             load_shader(char *vertex_shader_code,
 
   // Compile Vertex Shader
   const char *VertexSourcePointer = vertex_shader_code;
-  glShaderSource(VertexShaderID, 1, &VertexSourcePointer, NULL);
+  glShaderSource(
+      VertexShaderID, 1, &VertexSourcePointer, PCPREP_NULL);
   glCompileShader(VertexShaderID);
 
   // Check Vertex Shader
@@ -61,7 +62,7 @@ GLuint             load_shader(char *vertex_shader_code,
         (char *)malloc(InfoLogLength + 1);
     glGetShaderInfoLog(VertexShaderID,
                        InfoLogLength,
-                       NULL,
+                       PCPREP_NULL,
                        VertexShaderErrorMessage);
     fprintf(stderr, "%s\n", VertexShaderErrorMessage);
     free(VertexShaderErrorMessage);
@@ -69,7 +70,8 @@ GLuint             load_shader(char *vertex_shader_code,
 
   // Compile Fragment Shader
   const char *FragmentSourcePointer = fragment_shader_code;
-  glShaderSource(FragmentShaderID, 1, &FragmentSourcePointer, NULL);
+  glShaderSource(
+      FragmentShaderID, 1, &FragmentSourcePointer, PCPREP_NULL);
   glCompileShader(FragmentShaderID);
 
   // Check Fragment Shader
@@ -81,7 +83,7 @@ GLuint             load_shader(char *vertex_shader_code,
         (char *)malloc(InfoLogLength + 1);
     glGetShaderInfoLog(FragmentShaderID,
                        InfoLogLength,
-                       NULL,
+                       PCPREP_NULL,
                        FragmentShaderErrorMessage);
     fprintf(stderr, "%s\n", FragmentShaderErrorMessage);
     free(FragmentShaderErrorMessage);
@@ -100,7 +102,7 @@ GLuint             load_shader(char *vertex_shader_code,
   {
     char *ProgramErrorMessage = (char *)malloc(InfoLogLength + 1);
     glGetProgramInfoLog(
-        ProgramID, InfoLogLength, NULL, ProgramErrorMessage);
+        ProgramID, InfoLogLength, PCPREP_NULL, ProgramErrorMessage);
     fprintf(stderr, "%s\n", ProgramErrorMessage);
     free(ProgramErrorMessage);
   }
@@ -114,9 +116,9 @@ GLuint             load_shader(char *vertex_shader_code,
   return ProgramID;
 }
 
-static int pcp_canvas_start_gl(pcp_canvas_t *cv)
+static pcs_ret_t pcp_canvas_start_gl(pcp_canvas_t *cv)
 {
-  GLFWwindow *window   = NULL;
+  GLFWwindow *window   = PCPREP_NULL;
 
   cv->vertex_array_id  = 0;
   cv->program_id       = 0;
@@ -127,7 +129,7 @@ static int pcp_canvas_start_gl(pcp_canvas_t *cv)
   if (!glfwInit())
   {
     fprintf(stderr, "Failed to initialize GLFW\n");
-    return -1;
+    return PCPREP_RET_FAIL;
   }
 
   glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
@@ -135,12 +137,12 @@ static int pcp_canvas_start_gl(pcp_canvas_t *cv)
   glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
   glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE);
 
-  window = glfwCreateWindow(1, 1, "Hidden", NULL, NULL);
+  window = glfwCreateWindow(1, 1, "Hidden", PCPREP_NULL, PCPREP_NULL);
   if (!window)
   {
     fprintf(stderr, "Failed to open GLFW window.\n");
     glfwTerminate();
-    return -1;
+    return PCPREP_RET_FAIL;
   }
   glfwMakeContextCurrent(window);
 
@@ -149,7 +151,7 @@ static int pcp_canvas_start_gl(pcp_canvas_t *cv)
   {
     fprintf(stderr, "Failed to initialize GLEW\n");
     glfwTerminate();
-    return -1;
+    return PCPREP_RET_FAIL;
   }
 
   glClearColor(cv->bg_col.x / 255.0f,
@@ -181,7 +183,7 @@ static int pcp_canvas_start_gl(pcp_canvas_t *cv)
                0,
                GL_RGB,
                GL_UNSIGNED_BYTE,
-               NULL);
+               PCPREP_NULL);
 
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
@@ -208,12 +210,12 @@ static int pcp_canvas_start_gl(pcp_canvas_t *cv)
       GL_FRAMEBUFFER_COMPLETE)
   {
     fprintf(stderr, "Framebuffer is not complete!\n");
-    return -1;
+    return PCPREP_RET_FAIL;
   }
-  return 0;
+  return PCPREP_RET_SUCESS;
 }
 
-int canvas_free_gl(pcp_canvas_t *cv)
+pcp_ret_t pcp_canvas_free_gl(pcp_canvas_t *cv)
 {
   glDeleteFramebuffers(1, &cv->frame_buffer);
   glDeleteTextures(1, &cv->rendered_texture);
@@ -227,19 +229,19 @@ int canvas_free_gl(pcp_canvas_t *cv)
 
   glfwTerminate();
 
-  return 0;
+  return PCPREP_RET_SUCCESS;
 }
 
 #endif
 
-int pcp_canvas_init(pcp_canvas_t *cv,
-                    size_t        width,
-                    size_t        height,
+pcp_ret_t pcp_canvas_init(pcp_canvas_t *cv,
+                          size_t        width,
+                          size_t        height,
 #ifdef HAVE_GPU
-                    char *vert_shader,
-                    char *frag_shader,
+                          char *vert_shader,
+                          char *frag_shader,
 #endif
-                    pcp_vec3uc_t bg_col)
+                          pcp_vec3uc_t bg_col)
 {
   cv->width       = width;
   cv->height      = height;
@@ -261,9 +263,10 @@ int pcp_canvas_init(pcp_canvas_t *cv,
 #endif
 
   cv->clear = pcp_canvas_clear;
+  return PCPREP_RET_SUCCESS;
 }
 
-int canvas_free(pcp_canvas_t *cv)
+pcp_ret_t pcp_canvas_free(pcp_canvas_t *cv)
 {
   cv->bg_col = (pcp_vec3uc_t){0};
   if (cv->pixels)
@@ -290,15 +293,17 @@ int canvas_free(pcp_canvas_t *cv)
 #ifdef HAVE_GPU
   cv->vert_shader = 0;
   cv->frag_shader = 0;
-  canvas_free_gl(cv);
+  pcp_canvas_free_gl(cv);
 #endif
+
+  return PCPREP_RET_SUCCESS;
 }
 #ifdef HAVE_GPU
-void pcp_canvas_draw_points_gpu(pcp_canvas_t  *cv,
-                                float         *mvp,
-                                float         *pos,
-                                unsigned char *rgb,
-                                size_t         count)
+pcp_ret_t pcp_canvas_draw_points_gpu(pcp_canvas_t  *cv,
+                                     float         *mvp,
+                                     float         *pos,
+                                     unsigned char *rgb,
+                                     size_t         count)
 {
   unsigned int vbuffer = 0;
   unsigned int rbuffer = 0;
@@ -323,11 +328,12 @@ void pcp_canvas_draw_points_gpu(pcp_canvas_t  *cv,
 
   glEnableVertexAttribArray(0);
   glBindBuffer(GL_ARRAY_BUFFER, vbuffer);
-  glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, NULL);
+  glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, PCPREP_NULL);
 
   glEnableVertexAttribArray(1);
   glBindBuffer(GL_ARRAY_BUFFER, rbuffer);
-  glVertexAttribPointer(1, 3, GL_UNSIGNED_BYTE, GL_TRUE, 0, NULL);
+  glVertexAttribPointer(
+      1, 3, GL_UNSIGNED_BYTE, GL_TRUE, 0, PCPREP_NULL);
 
   glBindFramebuffer(GL_FRAMEBUFFER, cv->frame_buffer);
   glViewport(0, 0, cv->width, cv->height);
@@ -348,18 +354,20 @@ void pcp_canvas_draw_points_gpu(pcp_canvas_t  *cv,
 
   glDeleteBuffers(1, &rbuffer);
   glDeleteBuffers(1, &vbuffer);
+
+  return PCPREP_RET_SUCCESS;
 }
 #endif
 
-void pcp_canvas_draw_points_cpu(pcp_canvas_t  *cv,
-                                float         *mvp,
-                                float         *pos,
-                                unsigned char *rgb,
-                                size_t         count)
+pcp_ret_t pcp_canvas_draw_points_cpu(pcp_canvas_t  *cv,
+                                     float         *mvp,
+                                     float         *pos,
+                                     unsigned char *rgb,
+                                     size_t         count)
 {
-  pcp_vec3f_t  *positions  = NULL;
-  pcp_vec3uc_t *colors     = NULL;
-  pcp_vec3uc_t *rgb_pixels = NULL;
+  pcp_vec3f_t  *positions  = PCPREP_NULL;
+  pcp_vec3uc_t *colors     = PCPREP_NULL;
+  pcp_vec3uc_t *rgb_pixels = PCPREP_NULL;
   size_t        screen_w   = 0;
   size_t        screen_h   = 0;
 
@@ -399,9 +407,10 @@ void pcp_canvas_draw_points_cpu(pcp_canvas_t  *cv,
       }
     }
   }
+  return PCPREP_RET_SUCCESS;
 }
 
-void pcp_canvas_clear(pcp_canvas_t *cv)
+pcp_ret_t pcp_canvas_clear(pcp_canvas_t *cv)
 {
   memset(cv->pixels,
          0,
@@ -410,4 +419,5 @@ void pcp_canvas_clear(pcp_canvas_t *cv)
   {
     memset(cv->min_z_value[i], 0, sizeof(float) * cv->width);
   }
+  return PCPREP_RET_SUCCESS;
 }

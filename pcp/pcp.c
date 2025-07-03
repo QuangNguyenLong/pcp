@@ -44,22 +44,23 @@ int pcp_prepare(struct arguments *arg)
                                        sizeof(pcp_point_cloud_t));
   for (int t = 0; t < in_count; t++)
   {
+    pcp_point_cloud_init(&in_pcs[t]);
     snprintf(input_tile_path, max_path_size, input_path, t);
-    pcp_point_cloud_load(&in_pcs[t], input_tile_path);
+    in_pcs[t].load(&in_pcs[t], input_tile_path);
   }
   read_time = get_current_time_ms() - curr_time;
   curr_time = get_current_time_ms();
   // this only run if in_count = 1
   if (in_count == 1 && arg->plan & PCP_PLAN_TILE_NONE)
   {
-    int nx = 0;
-    int ny = 0;
-    int nz = 0;
-    nx     = arg->tile.nx;
-    ny     = arg->tile.ny;
-    nz     = arg->tile.nz;
-    proc_count =
-        pcp_point_cloud_tile(in_pcs[0], nx, ny, nz, &proc_pcs);
+    int nx     = 0;
+    int ny     = 0;
+    int nz     = 0;
+    nx         = arg->tile.nx;
+    ny         = arg->tile.ny;
+    nz         = arg->tile.nz;
+    proc_count = nx * ny * nz;
+    in_pcs[0].tile(&in_pcs[0], nx, ny, nz, &proc_pcs);
     for (int i = 0; i < in_count; i++)
       pcp_point_cloud_free(&in_pcs[i]);
     free(in_pcs);
@@ -67,6 +68,7 @@ int pcp_prepare(struct arguments *arg)
   else if (in_count > 1 && arg->plan & PCP_PLAN_MERGE_NONE)
   {
     proc_pcs = (pcp_point_cloud_t *)malloc(sizeof(pcp_point_cloud_t));
+    pcp_point_cloud_init(proc_pcs);
     proc_count = point_cloud_merge(in_pcs, in_count, &proc_pcs[0]);
     for (int i = 0; i < in_count; i++)
       pcp_point_cloud_free(&in_pcs[i]);
@@ -244,6 +246,7 @@ int pcp_prepare(struct arguments *arg)
   if (arg->plan & PCP_PLAN_NONE_MERGE)
   {
     out_pcs = (pcp_point_cloud_t *)malloc(sizeof(pcp_point_cloud_t));
+    pcp_point_cloud_init(out_pcs);
     out_count = point_cloud_merge(proc_pcs, proc_count, &out_pcs[0]);
     for (int i = 0; i < proc_count; i++)
       pcp_point_cloud_free(&proc_pcs[i]);
@@ -251,14 +254,14 @@ int pcp_prepare(struct arguments *arg)
   }
   else if (arg->plan & PCP_PLAN_NONE_TILE)
   {
-    int nx = 0;
-    int ny = 0;
-    int nz = 0;
-    nx     = arg->tile.nx;
-    ny     = arg->tile.ny;
-    nz     = arg->tile.nz;
-    out_count =
-        pcp_point_cloud_tile(proc_pcs[0], nx, ny, nz, &out_pcs);
+    int nx    = 0;
+    int ny    = 0;
+    int nz    = 0;
+    nx        = arg->tile.nx;
+    ny        = arg->tile.ny;
+    nz        = arg->tile.nz;
+    out_count = nx * ny * nz;
+    proc_pcs[0].tile(&proc_pcs[0], nx, ny, nz, &out_pcs);
     for (int i = 0; i < proc_count; i++)
       pcp_point_cloud_free(&proc_pcs[i]);
     free(proc_pcs);
@@ -282,7 +285,7 @@ int pcp_prepare(struct arguments *arg)
       printf("Tile %d have no points, skip writing...\n", t);
     }
     snprintf(output_tile_path, max_path_size, output_path, t);
-    pcp_point_cloud_write(out_pcs[t], output_tile_path, binary);
+    out_pcs[t].write(&out_pcs[t], output_tile_path, binary);
   }
 
   write_time = get_current_time_ms() - curr_time;

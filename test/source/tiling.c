@@ -28,8 +28,11 @@ int main(int argc, char *argv[])
   struct stat        st         = {0};
   int                tile_count = 0;
 
-  pcp_point_cloud_load(&pc, input_file_path);
-  tile_count = pcp_point_cloud_tile(pc, n_x, n_y, n_z, &tiles);
+  pcp_point_cloud_init(&pc);
+
+  pc.load(&pc, input_file_path);
+  tile_count = n_x * n_y * n_z;
+  pc.tile(&pc, n_x, n_y, n_z, &tiles);
 
   if (stat(out_folder, &st) == -1)
   {
@@ -47,7 +50,7 @@ int main(int argc, char *argv[])
              "%s/tile%.04d.ply",
              out_folder,
              t);
-    pcp_point_cloud_write(tiles[t], out_file_name, isBinary);
+    tiles[t].write(&tiles[t], out_file_name, isBinary);
   }
 
   pcp_point_cloud_free(&pc);

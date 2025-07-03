@@ -55,11 +55,14 @@ int main(int argc, char *argv[])
   int              *index_arr    = NULL;
   int              *sample       = NULL;
 
-  pcp_point_cloud_load(&pc, argv[1]);
+  pcp_point_cloud_init(&pc);
+  pcp_point_cloud_init(&sub);
+
+  pc.load(&pc, argv[1]);
   NvertPercent = atof(argv[2]);
   subVerts     = (int)(pc.size * NvertPercent);
 
-  pcp_point_cloud_init(&sub, subVerts);
+  sub.alloc(&sub, subVerts);
   index_arr = (int *)malloc(sizeof(int) * pc.size);
   sample    = (int *)malloc(subVerts * sizeof(int));
   srand((unsigned int)time(NULL)); // Seed the random number generator
@@ -77,7 +80,7 @@ int main(int argc, char *argv[])
       sub.rgb[i * 3 + j] = pc.rgb[sample[i] * 3 + j];
     }
   }
-  pcp_point_cloud_write(sub, argv[3], 1);
+  sub.write(&sub, argv[3], 1);
 
   pcp_point_cloud_free(&pc);
   pcp_point_cloud_free(&sub);

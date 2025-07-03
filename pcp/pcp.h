@@ -178,8 +178,9 @@ unsigned int pcp_sample_p(pcp_point_cloud_t *pc, void *arg, int pc_id)
 {
   pcp_sample_p_arg_t *param = (pcp_sample_p_arg_t *)arg;
 
-  pcp_point_cloud_t   out   = {NULL, NULL, 0};
-  pcp_point_cloud_sample(*pc, param->ratio, param->strategy, &out);
+  pcp_point_cloud_t   out   = {0};
+  pcp_point_cloud_init(&out);
+  pc->sample(pc, param->ratio, param->strategy, &out);
   pcp_point_cloud_free(pc);
   *pc = out;
   return 1;
@@ -189,8 +190,9 @@ unsigned int pcp_voxel_p(pcp_point_cloud_t *pc, void *arg, int pc_id)
 {
   float             step_size = *(float *)arg;
 
-  pcp_point_cloud_t out       = {NULL, NULL, 0};
-  pcp_point_cloud_voxelize(*pc, step_size, &out);
+  pcp_point_cloud_t out       = {0};
+  pcp_point_cloud_init(&out);
+  pc->voxelize(pc, step_size, &out);
   pcp_point_cloud_free(pc);
   *pc = out;
   return 1;
@@ -199,8 +201,9 @@ unsigned int pcp_voxel_p(pcp_point_cloud_t *pc, void *arg, int pc_id)
 unsigned int
 pcp_remove_dupplicates_p(pcp_point_cloud_t *pc, void *arg, int pc_id)
 {
-  pcp_point_cloud_t out = {NULL, NULL, 0};
-  pcp_point_cloud_remove_dupplicates(*pc, &out);
+  pcp_point_cloud_t out = {0};
+  pcp_point_cloud_init(&out);
+  pc->remove_dupplicates(pc, &out);
   pcp_point_cloud_free(pc);
   *pc = out;
   return 1;
@@ -217,9 +220,10 @@ unsigned int pcp_aabb_s(pcp_point_cloud_t *pc, void *arg, int pc_id)
 {
   pcp_aabb_s_arg_t *param = (pcp_aabb_s_arg_t *)arg;
 
-  pcp_vec3f_t       min, max;
-  pcp_point_cloud_get_min(*pc, &min);
-  pcp_point_cloud_get_max(*pc, &max);
+  pcp_vec3f_t       min   = {0};
+  pcp_vec3f_t       max   = {0};
+  pc->get_min(pc, &min);
+  pc->get_max(pc, &max);
   if (param->output == 0 || param->output == 2)
   {
     printf("Min: %f %f %f\n", min.x, min.y, min.z);
@@ -229,14 +233,22 @@ unsigned int pcp_aabb_s(pcp_point_cloud_t *pc, void *arg, int pc_id)
       return 1;
     }
   }
-  pcp_aabb_t aabb = {min, max};
-  pcp_mesh_t mesh = {0};
-  pcp_aabb_to_mesh(aabb, &mesh);
+  pcp_aabb_t aabb                 = {0};
+  pcp_mesh_t mesh                 = {0};
+  char       tile_path[SIZE_PATH] = {0};
 
-  char tile_path[SIZE_PATH];
+  pcp_mesh_init(&mesh);
+  pcp_aabb_init(&aabb);
+
+  aabb.min = min;
+  aabb.max = max;
+
+  aabb.to_mesh(&aabb, &mesh);
+
   snprintf(tile_path, SIZE_PATH, param->output_path, pc_id);
-  pcp_mesh_write(mesh, tile_path, param->binary);
+  mesh.write(&mesh, tile_path, param->binary);
   pcp_mesh_free(&mesh);
+  pcp_aabb_free(&aabb);
   return 1;
 }
 
@@ -268,7 +280,7 @@ pcp_save_viewport_s(pcp_point_cloud_t *pc, void *arg, int pc_id)
 
   for (int v = 0; v < param->mvp_count; v++)
   {
-    pcp_canvas_clear(&cv);
+    cv.clear(&cv);
 
     cv.draw_points(
         &cv, &param->mvps[v][0][0], pc->pos, pc->rgb, pc->size);
@@ -288,7 +300,7 @@ pcp_save_viewport_s(pcp_point_cloud_t *pc, void *arg, int pc_id)
       free(row_pointers[i]);
     free(row_pointers);
   }
-  canvas_free(&cv);
+  pcp_canvas_free(&cv);
   return 1;
 }
 #endif
@@ -318,14 +330,14 @@ pcp_pixel_per_tile_s(pcp_point_cloud_t *pc, void *arg, int pc_id)
 
   for (int v = 0; v < param->mvp_count; v++)
   {
-    pcp_point_cloud_get_pixel_per_tile(*pc,
-                                       param->nx,
-                                       param->ny,
-                                       param->nz,
-                                       param->width,
-                                       param->height,
-                                       &param->mvps[v][0][0],
-                                       &pixel_count[v][0]);
+    pc->get_pixel_per_tile(pc,
+                           param->nx,
+                           param->ny,
+                           param->nz,
+                           param->width,
+                           param->height,
+                           &param->mvps[v][0][0],
+                           &pixel_count[v][0]);
   }
   json_write_tiles_pixel(param->outpath,
                          num_tile,
@@ -352,24 +364,30 @@ unsigned int pcp_screen_area_estimation_s(pcp_point_cloud_t *pc,
                                           int                pc_id)
 {
   float                              *screen_ratio = NULL;
+  pcp_vec3f_t                         min          = {0};
+  pcp_vec3f_t                         max          = {0};
+  pcp_aabb_t                          aabb         = {0};
+  pcp_mesh_t                          aabb_m       = {0};
+
   pcp_screen_area_estimation_s_arg_t *param =
       (pcp_screen_area_estimation_s_arg_t *)arg;
 
-  pcp_vec3f_t min, max;
-  pcp_point_cloud_get_min(*pc, &min);
-  pcp_point_cloud_get_max(*pc, &max);
+  pc->get_min(pc, &min);
+  pc->get_max(pc, &max);
 
-  pcp_aabb_t aabb   = {.min = min, .max = max};
-  pcp_mesh_t aabb_m = {
-      .indices = NULL, .num_indices = 0, .num_verts = 0, .pos = NULL};
+  pcp_aabb_init(&aabb);
+  pcp_mesh_init(&aabb_m);
 
-  pcp_aabb_to_mesh(aabb, &aabb_m);
+  aabb.min = min;
+  aabb.max = max;
+
+  aabb.to_mesh(&aabb, &aabb_m);
 
   screen_ratio = (float *)malloc(sizeof(float) * param->mvp_count);
   for (int v = 0; v < param->mvp_count; v++)
   {
-    pcp_mesh_get_screen_ratio(
-        aabb_m, &param->mvps[v][0][0], &screen_ratio[v]);
+    aabb_m.get_screen_ratio(
+        &aabb_m, &param->mvps[v][0][0], &screen_ratio[v]);
   }
   char pc_path[SIZE_PATH];
   snprintf(pc_path, SIZE_PATH, param->outpath, pc_id);
@@ -380,4 +398,5 @@ unsigned int pcp_screen_area_estimation_s(pcp_point_cloud_t *pc,
                                     screen_ratio);
   free(screen_ratio);
   pcp_mesh_free(&aabb_m);
+  pcp_aabb_free(&aabb);
 }
