@@ -52,52 +52,35 @@ extern "C"
   PCPREP_EXPORT
   pcp_ret_t pcp_point_cloud_free(pcp_point_cloud_t *pc);
 
-  PCPREP_EXPORT
   pcp_ret_t pcp_point_cloud_alloc(pcp_point_cloud_t *pc, size_t size);
 
-  PCPREP_EXPORT
   pcp_ret_t pcp_point_cloud_load(pcp_point_cloud_t *pc,
                                  const char        *filename);
-  PCPREP_EXPORT
   pcp_ret_t pcp_point_cloud_write(pcp_point_cloud_t *pc,
                                   const char        *filename,
                                   int                binary);
-  // this doesn't need reference
-  PCPREP_EXPORT
   pcp_ret_t pcp_point_cloud_get_min(pcp_point_cloud_t *pc,
                                     pcp_vec3f_t       *min);
-  // this doesn't need reference
-  PCPREP_EXPORT
   pcp_ret_t pcp_point_cloud_get_max(pcp_point_cloud_t *pc,
                                     pcp_vec3f_t       *max);
 
-  // this doesn't need reference
-  // `tiles` should be passed as a reference of a pcp_point_cloud_t*
-  PCPREP_EXPORT
   pcp_ret_t pcp_point_cloud_tile(pcp_point_cloud_t  *pc,
                                  int                 n_x,
                                  int                 n_y,
                                  int                 n_z,
                                  pcp_point_cloud_t **tiles);
 
-  // `output` should be passed as a reference to a pcp_point_cloud_t
-  PCPREP_EXPORT
   pcp_ret_t pcp_point_cloud_sample(pcp_point_cloud_t *pc,
                                    float              ratio,
                                    unsigned char      strategy,
                                    pcp_point_cloud_t *out);
 
-  // `output` should be passed as a reference to a pcp_point_cloud_t
-  PCPREP_EXPORT
   pcp_ret_t
-  pcp_point_cloud_remove_dupplicates(pcp_point_cloud_t *pc,
-                                     pcp_point_cloud_t *out);
-  // `output` should be passed as a reference to a pcp_point_cloud_t
-  PCPREP_EXPORT
+            pcp_point_cloud_remove_dupplicates(pcp_point_cloud_t *pc,
+                                               pcp_point_cloud_t *out);
   pcp_ret_t pcp_point_cloud_voxelize(pcp_point_cloud_t *pc,
                                      float              voxel_size,
                                      pcp_point_cloud_t *out);
-  PCPREP_EXPORT
   pcp_ret_t pcp_point_cloud_get_pixel_per_tile(pcp_point_cloud_t *pc,
                                                int                nx,
                                                int                ny,
